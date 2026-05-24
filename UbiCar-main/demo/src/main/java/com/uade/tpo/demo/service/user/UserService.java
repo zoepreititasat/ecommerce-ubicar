@@ -30,5 +30,5 @@ public interface UserService {
 
     //roles (admin)
     public UserResponse changeRole(Long id, Role role);
+    void descuentoPrimeraCompraUsado(Long userId);
 }
-    
