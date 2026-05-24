@@ -4,7 +4,6 @@ import java.util.List;
 
 import com.uade.tpo.demo.controllers.reservation.ReservationRequest;
 import com.uade.tpo.demo.controllers.reservation.ReservationResponse;
-import com.uade.tpo.demo.entity.Reservation;
 
 public interface ReservationService {
     

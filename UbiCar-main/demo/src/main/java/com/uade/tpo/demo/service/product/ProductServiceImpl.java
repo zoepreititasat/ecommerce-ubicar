@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.neo4j.Neo4jProperties.Authentication;
 import org.springframework.stereotype.Service;
 
 import com.uade.tpo.demo.controllers.product.ProductRequest;
@@ -39,150 +38,125 @@ public class ProductServiceImpl implements ProductService {
     private ImageRepository imageRepository;
 
 
-    private ProductResponse toResponse(Product product) {
-    
-        List<Long> imageIds = imageRepository.findByProductId(product.getId()).stream().map(Image::getId).toList();
+    private ProductResponse toResponse(Product product, boolean aplicarDescuentoPrimeraCompra) {
+        List<Long> imageIds = imageRepository.findByProductId(product.getId())
+                .stream().map(Image::getId).toList();
 
-    return ProductResponse.builder()
-            .id(product.getId())
-            .title(product.getTitle())
-            .description(product.getDescription())
-            .price(product.getPrice())
-            .vehicleType(product.getVehicleType())
-            .active(product.isActive())
-            .sellerId(product.getSeller().getId())
-            .imageIds(imageIds)
-            .build();
-}
+        Double finalPrice = product.getPrice();
+        if (aplicarDescuentoPrimeraCompra) {
+            finalPrice = finalPrice * 0.85;
+        }
 
-
-
-  
-    public List<ProductResponse> getAvailableProducts(LocalDate date) {
-        
-        return productRepository.findAvailableProducts(date)
-        .stream()
-        .map(this::toResponse)
-        .toList(); 
-
-
+        return ProductResponse.builder()
+                .id(product.getId())
+                .title(product.getTitle())
+                .description(product.getDescription())
+                .price(product.getPrice())
+                .finalPrice(finalPrice)
+                .vehicleType(product.getVehicleType())
+                .active(product.isActive())
+                .sellerId(product.getSeller().getId())
+                .imageIds(imageIds)
+                .build();
     }
 
+
+    public List<ProductResponse> getAvailableProducts(LocalDate date) {
+        User user = authenticationService.getCurrentUser();
+        boolean descuento = !user.isPrimeraCompraRealizada();
+        return productRepository.findAvailableProducts(date)
+                .stream()
+                .map(p -> toResponse(p, descuento))
+                .toList();
+    }
 
     public List<ProductResponse> getActiveProducts() {
+        User user = authenticationService.getCurrentUser();
+        boolean descuento = !user.isPrimeraCompraRealizada();
         return productRepository.findByActiveTrue()
-        .stream()
-        .map(this::toResponse)
-        .toList();
+                .stream()
+                .map(p -> toResponse(p, descuento))
+                .toList();
     }
 
-   
     public ProductResponse getProductById(Long id) {
-
-        return toResponse(productRepository.findById(id).orElseThrow(() -> new ProductNotFoundException()));
+        User user = authenticationService.getCurrentUser();
+        boolean descuento = !user.isPrimeraCompraRealizada();
+        return toResponse(
+                productRepository.findById(id).orElseThrow(ProductNotFoundException::new),
+                descuento
+        );
     }
-
 
     public List<ProductResponse> getProductsBySellerId(Long sellerId) {
+        User user = authenticationService.getCurrentUser();
+        boolean descuento = !user.isPrimeraCompraRealizada();
         return productRepository.findBySellerId(sellerId)
-        .stream()
-        .map(this::toResponse)
-        .toList();
+                .stream()
+                .map(p -> toResponse(p, descuento))
+                .toList();
     }
 
     public List<ProductResponse> getProductsByVehicleType(VehicleType vehicleType) {
-
+        User user = authenticationService.getCurrentUser();
+        boolean descuento = !user.isPrimeraCompraRealizada();
         return productRepository.findByVehicleType(vehicleType)
-        .stream()
-        .map(this::toResponse)
-        .toList();
+                .stream()
+                .map(p -> toResponse(p, descuento))
+                .toList();
     }
 
     public List<ProductResponse> getProductsByPriceRange(Double minPrice, Double maxPrice) {
+        User user = authenticationService.getCurrentUser();
+        boolean descuento = !user.isPrimeraCompraRealizada();
         return productRepository.findByPriceBetween(minPrice, maxPrice)
-        .stream()
-        .map(this::toResponse)
-        .toList();
+                .stream()
+                .map(p -> toResponse(p, descuento))
+                .toList();
     }
 
-    
     public ProductResponse createProduct(ProductRequest request) {
+        User seller = authenticationService.getCurrentUser();
 
-       User seller = authenticationService.getCurrentUser();
+        Optional<Product> existingProduct = productRepository.findByTitleAndAddressAndSellerId(
+                request.getTitle(), request.getAddress(), seller.getId()
+        );
+        if (existingProduct.isPresent()) throw new ProductAlreadyExistsException();
 
-       Optional<Product> existingProduct =
-            productRepository.findByTitleAndAddressAndSellerId(
-                    request.getTitle(),
-                    request.getAddress(),
-                    seller.getId()
-            );
-
-        if (existingProduct.isPresent()) {
-            throw new ProductAlreadyExistsException(); 
-        }
-
-        Product product = Product.builder().title(request.getTitle())
+        Product product = Product.builder()
+                .title(request.getTitle())
                 .description(request.getDescription())
                 .price(request.getPrice())
                 .address(request.getAddress())
                 .active(request.getActive())
-                .discountPercentage(request.getDiscountPercentage())
-                .discountActive(request.getDiscountActive())
                 .vehicleType(VehicleType.valueOf(request.getVehicleType().toUpperCase()))
                 .seller(seller)
                 .build();
 
         productRepository.save(product);
-
-        return toResponse(product);
+        return toResponse(product, false);
     }
-
 
     public ProductResponse updateProduct(Long id, ProductUpdateRequest request) {
-
         User seller = authenticationService.getCurrentUser();
+        Product product = productRepository.findById(id).orElseThrow(ProductNotFoundException::new);
 
-        Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ProductNotFoundException());
+        if (!product.getSeller().getId().equals(seller.getId())) throw new ProductUnauthorizedException();
 
-        if (!product.getSeller().getId().equals(seller.getId())) {
-            throw new ProductUnauthorizedException();
-        }
-        
-            if (request.getTitle() != null) {
-                product.setTitle(request.getTitle());
-            }
-            if (request.getDescription() != null) {
-                product.setDescription(request.getDescription());
-            }
-            if (request.getPrice() != null) {
-                product.setPrice(request.getPrice());
-            }
-            if (request.getAddress() != null) {
-                product.setAddress(request.getAddress());
-            }
-            if (request.getDiscountPercentage() != null) {
-                product.setDiscountPercentage(request.getDiscountPercentage());
-            }
-            if (request.getDiscountActive() != null) {
-                product.setDiscountActive(request.getDiscountActive());
-            }
-            if (request.getVehicleType() != null) {
-                product.setVehicleType(VehicleType.valueOf(request.getVehicleType().toUpperCase()));
-            }
+        if (request.getTitle() != null) product.setTitle(request.getTitle());
+        if (request.getDescription() != null) product.setDescription(request.getDescription());
+        if (request.getPrice() != null) product.setPrice(request.getPrice());
+        if (request.getAddress() != null) product.setAddress(request.getAddress());
+        if (request.getVehicleType() != null) product.setVehicleType(VehicleType.valueOf(request.getVehicleType().toUpperCase()));
 
         productRepository.save(product);
-        return toResponse(product);
+        return toResponse(product, false);
     }
-
 
     public ProductResponse updateProductState(Long id, ProductStatusRequest request) {
-        Product product = productRepository.findById(id).orElseThrow(() -> new ProductNotFoundException());
+        Product product = productRepository.findById(id).orElseThrow(ProductNotFoundException::new);
         product.setActive(request.getActive());
         productRepository.save(product);
-        return toResponse(product);
-       
+        return toResponse(product, false);
     }
-
-    
 }

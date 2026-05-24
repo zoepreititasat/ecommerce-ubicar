@@ -8,7 +8,5 @@ public class ProductUpdateRequest {  //no se pide: id,sellerId y active. Esto so
     private String description;
     private Double price;
     private String address;
-    private Double discountPercentage;
-    private Boolean discountActive;
     private String vehicleType;
 }

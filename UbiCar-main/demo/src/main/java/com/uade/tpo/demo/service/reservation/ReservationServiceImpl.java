@@ -17,7 +17,7 @@ import com.uade.tpo.demo.repository.BlockedDateRepository;
 import com.uade.tpo.demo.repository.ProductRepository;
 import com.uade.tpo.demo.repository.ReservationRepository;
 import com.uade.tpo.demo.service.AuthenticationService;
-import com.uade.tpo.demo.service.product.ProductService;
+import com.uade.tpo.demo.service.user.UserService;
 
 @Service
 public class ReservationServiceImpl implements ReservationService {
@@ -33,6 +33,9 @@ public class ReservationServiceImpl implements ReservationService {
 
     @Autowired
     private AuthenticationService authenticationService;
+
+    @Autowired
+    private UserService userService;
 
 
     private ReservationResponse toResponse(Reservation reservation) {
@@ -116,6 +119,10 @@ public class ReservationServiceImpl implements ReservationService {
 
         if(reservation.getStatus() == ReservationStatus.CANCELLED) {
             throw new RuntimeException("You cannot pay for a cancelled reservation");
+        }
+        if (!user.isPrimeraCompraRealizada()) {
+            reservation.setTotal(reservation.getTotal() * 0.85);
+            userService.descuentoPrimeraCompraUsado(user.getId());
         }
 
         reservation.setStatus(ReservationStatus.CONFIRMED);

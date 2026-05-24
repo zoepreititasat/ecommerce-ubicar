@@ -101,5 +101,8 @@ public class User implements UserDetails    {
     public boolean isEnabled() {
         return active;
     }
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean primeraCompraRealizada = false;
 
 }

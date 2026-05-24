@@ -14,6 +14,7 @@ public class ProductResponse {
     private String title;
     private String description;
     private Double price;
+    private Double finalPrice; //precio final con descuento 
     private VehicleType vehicleType;
     private Boolean active;
     private Long sellerId;

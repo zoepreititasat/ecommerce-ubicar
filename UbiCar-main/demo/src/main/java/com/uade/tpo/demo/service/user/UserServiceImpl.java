@@ -123,6 +123,12 @@ public class UserServiceImpl implements UserService {
 
         return mapToResponse(userRepository.save(user));
     }
+    public void descuentoPrimeraCompraUsado(Long userId) {
+    User user = userRepository.findById(userId)
+            .orElseThrow(() -> new UserNotFoundException());
+    user.setPrimeraCompraRealizada(true);
+    userRepository.save(user);
+    }
 
     //convierte el usuario de bd a un formato de respuesta--> oculta password
     private UserResponse mapToResponse(User user) {
@@ -132,6 +138,7 @@ public class UserServiceImpl implements UserService {
         .lastName(user.getLastName())
         .email(user.getEmail())
         .role(user.getRole())
+        .primeraCompra(user.isPrimeraCompraRealizada()) 
         .build();
     }
 
