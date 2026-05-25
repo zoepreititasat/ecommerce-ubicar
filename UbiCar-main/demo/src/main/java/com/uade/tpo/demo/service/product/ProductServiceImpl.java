@@ -62,8 +62,8 @@ public class ProductServiceImpl implements ProductService {
 
 
     public List<ProductResponse> getAvailableProducts(LocalDate date) {
-        User user = authenticationService.getCurrentUser();
-        boolean descuento = !user.isPrimeraCompraRealizada();
+        User user = authenticationService.getCurrentUserOrNull();
+        boolean descuento = user != null && !user.isPrimeraCompraRealizada();
         return productRepository.findAvailableProducts(date)
                 .stream()
                 .map(p -> toResponse(p, descuento))
@@ -71,8 +71,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     public List<ProductResponse> getActiveProducts() {
-        User user = authenticationService.getCurrentUser();
-        boolean descuento = !user.isPrimeraCompraRealizada();
+        User user = authenticationService.getCurrentUserOrNull();
+        boolean descuento = user != null && !user.isPrimeraCompraRealizada();
         return productRepository.findByActiveTrue()
                 .stream()
                 .map(p -> toResponse(p, descuento))
@@ -80,8 +80,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     public ProductResponse getProductById(Long id) {
-        User user = authenticationService.getCurrentUser();
-        boolean descuento = !user.isPrimeraCompraRealizada();
+        User user = authenticationService.getCurrentUserOrNull();
+        boolean descuento = user != null && !user.isPrimeraCompraRealizada();
         return toResponse(
                 productRepository.findById(id).orElseThrow(ProductNotFoundException::new),
                 descuento
@@ -89,8 +89,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     public List<ProductResponse> getProductsBySellerId(Long sellerId) {
-        User user = authenticationService.getCurrentUser();
-        boolean descuento = !user.isPrimeraCompraRealizada();
+        User user = authenticationService.getCurrentUserOrNull();
+        boolean descuento = user != null && !user.isPrimeraCompraRealizada();
         return productRepository.findBySellerId(sellerId)
                 .stream()
                 .map(p -> toResponse(p, descuento))
@@ -98,8 +98,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     public List<ProductResponse> getProductsByVehicleType(VehicleType vehicleType) {
-        User user = authenticationService.getCurrentUser();
-        boolean descuento = !user.isPrimeraCompraRealizada();
+        User user = authenticationService.getCurrentUserOrNull();
+        boolean descuento = user != null && !user.isPrimeraCompraRealizada();
         return productRepository.findByVehicleType(vehicleType)
                 .stream()
                 .map(p -> toResponse(p, descuento))
@@ -107,8 +107,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     public List<ProductResponse> getProductsByPriceRange(Double minPrice, Double maxPrice) {
-        User user = authenticationService.getCurrentUser();
-        boolean descuento = !user.isPrimeraCompraRealizada();
+        User user = authenticationService.getCurrentUserOrNull();
+        boolean descuento = user != null && !user.isPrimeraCompraRealizada();
         return productRepository.findByPriceBetween(minPrice, maxPrice)
                 .stream()
                 .map(p -> toResponse(p, descuento))
