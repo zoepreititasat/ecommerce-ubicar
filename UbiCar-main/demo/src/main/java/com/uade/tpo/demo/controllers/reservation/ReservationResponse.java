@@ -12,7 +12,8 @@ import lombok.Data;
 public class ReservationResponse {
 
     private Long id;
-    private LocalDate date;
+    private LocalDate startDate;
+    private LocalDate endDate;
 
     // info del producto
     private Long productId;
