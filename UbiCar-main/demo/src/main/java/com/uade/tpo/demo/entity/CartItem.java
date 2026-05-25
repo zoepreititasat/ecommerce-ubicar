@@ -21,7 +21,8 @@ public class CartItem {
     @JoinColumn(name = "product_id")
     private Product product;
 
-    private LocalDate date;
+    private LocalDate startDate;
+    private LocalDate endDate;
 
     
 }

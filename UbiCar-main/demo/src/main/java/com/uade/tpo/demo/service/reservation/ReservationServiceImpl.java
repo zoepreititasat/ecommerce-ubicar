@@ -1,5 +1,7 @@
 package com.uade.tpo.demo.service.reservation;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +45,8 @@ public class ReservationServiceImpl implements ReservationService {
             .id(reservation.getId())
             .productId(reservation.getProduct().getId())
             .productTitle(reservation.getProduct().getTitle())
-            .date(reservation.getDate())
+            .startDate(reservation.getStartDate())
+            .endDate(reservation.getEndDate())
             .total(reservation.getTotal())
             .userId(reservation.getUser().getId())
             .userEmail(reservation.getUser().getEmail())
@@ -66,42 +69,54 @@ public class ReservationServiceImpl implements ReservationService {
 
 
     public ReservationResponse createReservation(ReservationRequest request) {
-       
-       User user = authenticationService.getCurrentUser(); //TODO: implement this method to get the user from the token
 
-       Product product = productRepository.findById(request.getProductId()).orElseThrow(() -> new ProductNotFoundException()); //TODO: implement this method to get the product by id
+    User user = authenticationService.getCurrentUser();
 
-        if(!product.isActive()) {
-            throw new RuntimeException("El producto no está activo");
+    Product product = productRepository.findById(request.getProductId())
+            .orElseThrow(() -> new ProductNotFoundException());
+
+    if (!product.isActive()) {
+        throw new RuntimeException("El producto no está activo");
+    }
+
+    LocalDate current = request.getStartDate();
+    while (!current.isAfter(request.getEndDate())) {
+        if (blockedDateRepository.existsByProductIdAndDate(request.getProductId(), current)) {
+            throw new RuntimeException("El producto no está disponible el " + current);
         }
+        current = current.plusDays(1);
+    }
 
-        boolean blocked = blockedDateRepository.existsByProductIdAndDate(request.getProductId(), request.getDate()); //TODO: implement this method to check if the date is blocked for the product
+    if (user.getId().equals(product.getSeller().getId())) {
+        throw new RuntimeException("No puedes reservar tu propio producto");
+    }
 
-        if (blocked){
-            throw new RuntimeException("El producto no está disponible para la fecha seleccionada");
-        }
+    // calcula total x dias
+    long days = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
+    double total = product.getPrice() * days;
 
-        if(user.getId().equals(product.getSeller().getId())) {
-            throw new RuntimeException("No puedes reservar tu propio producto");
-        }
-       
-        Reservation reservation = Reservation.builder()
+    Reservation reservation = Reservation.builder()
             .user(user)
             .product(product)
-            .date(request.getDate())
-            .total(product.getPrice())
+            .startDate(request.getStartDate())
+            .endDate(request.getEndDate())
+            .total(total)
             .status(ReservationStatus.PENDING)
             .build();
 
+    LocalDate day = request.getStartDate();
+    while (!day.isAfter(request.getEndDate())) {
         BlockedDate blockedDate = BlockedDate.builder()
-            .product(product)
-            .date(request.getDate())
-            .build();
-        blockedDateRepository.save(blockedDate); 
-
-
-        return toResponse(reservationRepository.save(reservation));
+                .product(product)
+                .date(day)
+                .build();
+        blockedDateRepository.save(blockedDate);
+        day = day.plusDays(1);
     }
+
+    return toResponse(reservationRepository.save(reservation));
+    }
+    
 
 
     public ReservationResponse payReservation(Long id) {
@@ -148,7 +163,11 @@ public class ReservationServiceImpl implements ReservationService {
 
         reservation.setStatus(ReservationStatus.CANCELLED);
 
-        blockedDateRepository.deleteByProductIdAndDate(reservation.getProduct().getId(), reservation.getDate()); 
+        LocalDate day = reservation.getStartDate();
+        while (!day.isAfter(reservation.getEndDate())) {
+            blockedDateRepository.deleteByProductIdAndDate(reservation.getProduct().getId(), day);
+            day = day.plusDays(1);
+        } 
         return toResponse(reservationRepository.save(reservation));
 }
 }

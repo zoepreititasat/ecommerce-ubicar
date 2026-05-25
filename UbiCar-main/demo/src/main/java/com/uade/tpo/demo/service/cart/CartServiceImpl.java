@@ -2,9 +2,8 @@ package com.uade.tpo.demo.service.cart;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -45,15 +44,12 @@ public class CartServiceImpl implements CartService {
     private CartRepository cartRepository;
 
     @Autowired
-    private CartItemRepository cartItemRepository;
-
-    @Autowired
     private ProductRepository productRepository;
 
     @Autowired
     private BlockedDateRepository blockedDateRepository;
 
-    @Deprecated
+    @Autowired
     private ReservationRepository reservationRepository;
 
     @Autowired
@@ -98,8 +94,7 @@ public class CartServiceImpl implements CartService {
 
         User user = getUserFromToken();
 
-        Cart cart = cartRepository.findByUserId(user.getId())
-                .orElseThrow(CartNotFoundException::new);
+        Cart cart = getCartForUser(user);
 
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(ProductNotFoundException::new);
@@ -107,34 +102,43 @@ public class CartServiceImpl implements CartService {
         if (!product.isActive()) {
             throw new RuntimeException("El producto no está activo");
         }
-        if (request.getDate().isBefore(LocalDate.now())) {
-        throw new RuntimeException("No podés reservar en una fecha pasada");
+
+        if (request.getStartDate().isBefore(LocalDate.now())) {
+            throw new RuntimeException("La fecha de inicio no puede ser en el pasado");
         }
-        boolean blocked = blockedDateRepository.existsByProductIdAndDate(
-                request.getProductId(), request.getDate());
-        if (blocked) {
-            throw new RuntimeException("La cochera no está disponible para esa fecha");
+
+        if (!request.getEndDate().isAfter(request.getStartDate())) {
+            throw new RuntimeException("La fecha de fin debe ser posterior a la de inicio");
+        }
+
+        LocalDate current = request.getStartDate();
+        while (!current.isAfter(request.getEndDate())) {
+            if (blockedDateRepository.existsByProductIdAndDate(request.getProductId(), current)) {
+                throw new RuntimeException("La cochera no está disponible el " + current);
+            }
+            current = current.plusDays(1);
         }
 
         boolean alreadyInCart = cart.getItems().stream()
                 .anyMatch(item -> item.getProduct().getId().equals(request.getProductId())
-                        && item.getDate().equals(request.getDate()));
+                        && !item.getEndDate().isBefore(request.getStartDate())
+                        && !item.getStartDate().isAfter(request.getEndDate()));
         if (alreadyInCart) {
             throw new ProductInCartException();
         }
 
-        // crear nuevo item
+        // Crear nuevo item
         CartItem item = new CartItem();
         item.setCart(cart);
         item.setProduct(product);
-        item.setDate(request.getDate());
+        item.setStartDate(request.getStartDate());
+        item.setEndDate(request.getEndDate());
         cart.getItems().add(item);
 
         cart.setExpiresAt(LocalDateTime.now().plusMinutes(CART_EXPIRATION_MINUTES));
 
         return cartRepository.save(cart);
     }
-
     // modificar fecha de un producto en el carrito
     @Override
     public Cart modifyCart(CartItemRequest request) {
@@ -144,15 +148,18 @@ public class CartServiceImpl implements CartService {
         Cart cart = cartRepository.findByUserId(user.getId())
                 .orElseThrow(CartNotFoundException::new);
 
-        boolean blocked = blockedDateRepository.existsByProductIdAndDate(
-                request.getProductId(), request.getDate());
-        if (blocked) {
-            throw new RuntimeException("La cochera no está disponible para esa fecha");
+        LocalDate current = request.getStartDate();
+        while (!current.isAfter(request.getEndDate())) {
+            if (blockedDateRepository.existsByProductIdAndDate(request.getProductId(), current)) {
+                throw new RuntimeException("La cochera no está disponible el " + current);
+            }
+            current = current.plusDays(1);
         }
 
         for (CartItem item : cart.getItems()) {
             if (item.getProduct().getId().equals(request.getProductId())) {
-                item.setDate(request.getDate());
+                item.setStartDate(request.getStartDate());
+                item.setEndDate(request.getEndDate());
                 return cartRepository.save(cart);
             }
         }
@@ -175,32 +182,48 @@ public class CartServiceImpl implements CartService {
         }
         //crear reserva
         for (CartItem item : cart.getItems()) {
-            boolean blocked = blockedDateRepository.existsByProductIdAndDate(
-                    item.getProduct().getId(), item.getDate());
-            if (blocked) {throw new RuntimeException("La cochera " + item.getProduct().getTitle() + " ya no está disponible para " + item.getDate());
+
+            // verificar que ningún día del rango esté bloqueado
+            LocalDate current = item.getStartDate();
+            while (!current.isAfter(item.getEndDate())) {
+                if (blockedDateRepository.existsByProductIdAndDate(item.getProduct().getId(), current)) {
+                    throw new RuntimeException("La cochera " + item.getProduct().getTitle() 
+                        + " ya no está disponible el " + current);
+                }
+                current = current.plusDays(1);
             }
+
+            //calcular total x cantidad de días
+            long days = ChronoUnit.DAYS.between(item.getStartDate(), item.getEndDate()) + 1;
+            double total = item.getProduct().getPrice() * days;
 
             Reservation reservation = Reservation.builder()
                     .user(user)
                     .product(item.getProduct())
-                    .date(item.getDate())
-                    .total(item.getProduct().getPrice())
+                    .startDate(item.getStartDate())
+                    .endDate(item.getEndDate())
+                    .total(total)
                     .status(ReservationStatus.PENDING)
                     .build();
             reservationRepository.save(reservation);
 
-            BlockedDate blockedDate = BlockedDate.builder()
-                    .product(item.getProduct())
-                    .date(item.getDate())
-                    .build();
-            blockedDateRepository.save(blockedDate);
+            LocalDate day = item.getStartDate();
+            while (!day.isAfter(item.getEndDate())) {
+                BlockedDate blockedDate = BlockedDate.builder()
+                        .product(item.getProduct())
+                        .date(day)
+                        .build();
+                blockedDateRepository.save(blockedDate);
+                day = day.plusDays(1);
+            }
         }
 
         cart.getItems().clear();
         cart.setExpiresAt(null);
 
         return cartRepository.save(cart);
-    }
+        }  
+
     @Scheduled(fixedRate = 10 * 60 * 1000)
     @Transactional
     public void clearExpiredCarts() {
