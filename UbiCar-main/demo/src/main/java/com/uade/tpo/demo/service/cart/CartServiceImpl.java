@@ -19,7 +19,6 @@ import com.uade.tpo.demo.entity.Reservation;
 import com.uade.tpo.demo.entity.ReservationStatus;
 import com.uade.tpo.demo.entity.User;
 import com.uade.tpo.demo.repository.BlockedDateRepository;
-import com.uade.tpo.demo.repository.CartItemRepository;
 import com.uade.tpo.demo.repository.CartRepository;
 import com.uade.tpo.demo.repository.ProductRepository;
 import com.uade.tpo.demo.repository.ReservationRepository;

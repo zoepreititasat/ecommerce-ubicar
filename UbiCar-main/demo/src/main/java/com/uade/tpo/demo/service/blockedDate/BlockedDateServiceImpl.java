@@ -74,16 +74,15 @@ public class BlockedDateServiceImpl implements BlockedDateService {
         throw new RuntimeException("No podés modificar fechas de un producto que no es tuyo");
     }
 
-        boolean hasConfirmedReservation = //busca si hay una reserva confirmada con esa fecha y ese producto no se agrega
-                reservationRepository.existsByProduct_IdAndDateAndStatus(
-                    productId,
-                    date,
-                    ReservationStatus.CONFIRMED
-                );
+    boolean hasConfirmedReservation = reservationRepository.existsConfirmedReservationForDate(
+        productId,
+        date,
+        ReservationStatus.CONFIRMED
+    );
 
-            if (hasConfirmedReservation) {
-                throw new RuntimeException("No se puede habilitar una fecha con una reserva confirmada");
-}
+    if (hasConfirmedReservation) {
+        throw new RuntimeException("No podés eliminar esta fecha porque hay una reserva confirmada para ese día");
+    }
 
         blockedDateRepository.delete(blockedDate);
     }
