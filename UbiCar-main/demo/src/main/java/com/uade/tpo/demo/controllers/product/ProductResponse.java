@@ -19,5 +19,10 @@ public class ProductResponse {
     private Boolean active;
     private Long sellerId;
     private List<Long> imageIds;
+    private String address;
+    private String zone;
+    private Double latitude;
+    private Double longitude;
+    private String sellerName;
 
 }
