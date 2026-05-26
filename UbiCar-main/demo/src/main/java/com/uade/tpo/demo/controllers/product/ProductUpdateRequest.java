@@ -9,4 +9,5 @@ public class ProductUpdateRequest {  //no se pide: id,sellerId y active. Esto so
     private Double price;
     private String address;
     private String vehicleType;
+    private String zone;
 }

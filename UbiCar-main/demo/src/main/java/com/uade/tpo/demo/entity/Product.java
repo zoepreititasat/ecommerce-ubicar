@@ -64,4 +64,13 @@ public class Product {
     @OneToMany(mappedBy = "product")
     private List<Reservation> reservations;
 
+    @Column(nullable = true)
+    private String zone;
+
+    @Column(nullable = true)
+    private Double latitude;
+
+    @Column(nullable = true)
+    private Double longitude;
+
 }
