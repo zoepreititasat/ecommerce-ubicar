@@ -3,6 +3,7 @@ package com.uade.tpo.demo.service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -55,6 +56,8 @@ public class AuthenticationService {
                 var jwtToken = jwtService.generateToken(user);
                 return AuthenticationResponse.builder()
                                 .accessToken(jwtToken)
+                                .firstname(user.getFirstName())
+                                .role(user.getRole().name())
                                 .build();
         }
 
@@ -69,6 +72,11 @@ public class AuthenticationService {
                 var jwtToken = jwtService.generateToken(user);
                 return AuthenticationResponse.builder()
                                 .accessToken(jwtToken)
+                                .firstname(user.getFirstName())
+                                .role(user.getRole().name())
+                                .lastname(user.getLastName())
+                                .id(user.getId())
+                                .email(user.getEmail())
                                 .build();
         }
         public User getCurrentUser() {
@@ -81,4 +89,12 @@ public class AuthenticationService {
                 return repository.findByEmail(email)
                         .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
                 }
+        public User getCurrentUserOrNull() {
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                if (authentication == null || !authentication.isAuthenticated() || 
+                    authentication.getPrincipal().equals("anonymousUser")) {
+                    return null;
+                }
+                return (User) authentication.getPrincipal();
+        }
 }

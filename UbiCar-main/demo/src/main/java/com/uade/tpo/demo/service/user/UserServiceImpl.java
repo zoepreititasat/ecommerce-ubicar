@@ -61,6 +61,10 @@ public class UserServiceImpl implements UserService {
             user.setPassword(passwordEncoder.encode(request.getPassword())); // 
         }
 
+        if (request.getEmail() != null) {
+         user.setEmail(request.getEmail());
+        }
+
         return mapToResponse(userRepository.save(user));
     }
 
@@ -141,5 +145,23 @@ public class UserServiceImpl implements UserService {
         .primeraCompra(user.isPrimeraCompraRealizada()) 
         .build();
     }
+    //public UserResponse changeActiveStatus(Long id, ChangeActiveStatusRequest request) {
+    //    User user = userRepository.findById(id)
+    //            .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+//
+    //    user.setActive(request.isActive());
+//
+    //    if (Boolean.FALSE.equals(request.isActive()) && user.getRole() == Role.SELLER) {
+    //        List<Product> products = productRepository.findBySellerId(user.getId());
+//
+    //        for (Product product : products) {
+    //            product.setActive(false);
+    //        }
+//
+    //        productRepository.saveAll(products);
+    //    }
+//
+    //    return mapToResponse(userRepository.save(user));
+    //    }
 
 }

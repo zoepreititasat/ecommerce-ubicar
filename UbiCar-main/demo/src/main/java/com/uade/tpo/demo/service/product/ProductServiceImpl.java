@@ -21,6 +21,7 @@ import com.uade.tpo.demo.repository.ImageRepository;
 import com.uade.tpo.demo.repository.ProductRepository;
 import com.uade.tpo.demo.repository.UserRepository;
 import com.uade.tpo.demo.service.AuthenticationService;
+import com.uade.tpo.demo.service.location.LocationService;
 
 @Service
 public class ProductServiceImpl implements ProductService {
@@ -37,11 +38,16 @@ public class ProductServiceImpl implements ProductService {
     @Autowired
     private ImageRepository imageRepository;
 
-
+    @Autowired
+    private LocationService locationService;
+    
     private ProductResponse toResponse(Product product, boolean aplicarDescuentoPrimeraCompra) {
         List<Long> imageIds = imageRepository.findByProductId(product.getId())
                 .stream().map(Image::getId).toList();
-
+        double[] coordinates = locationService.getCoordinatesFromAddress(
+        product.getAddress(),
+        product.getZone());
+        
         Double finalPrice = product.getPrice();
         if (aplicarDescuentoPrimeraCompra) {
             finalPrice = finalPrice * 0.85;
@@ -51,19 +57,24 @@ public class ProductServiceImpl implements ProductService {
                 .id(product.getId())
                 .title(product.getTitle())
                 .description(product.getDescription())
+                .address(product.getAddress())
+                .latitude(coordinates[0])
+                .longitude(coordinates[1])
+                .zone(product.getZone())
                 .price(product.getPrice())
                 .finalPrice(finalPrice)
                 .vehicleType(product.getVehicleType())
                 .active(product.isActive())
                 .sellerId(product.getSeller().getId())
+                .sellerName(product.getSeller().getFirstName() + " " + product.getSeller().getLastName())
                 .imageIds(imageIds)
                 .build();
     }
 
 
     public List<ProductResponse> getAvailableProducts(LocalDate date) {
-        User user = authenticationService.getCurrentUser();
-        boolean descuento = !user.isPrimeraCompraRealizada();
+        User user = authenticationService.getCurrentUserOrNull();
+        boolean descuento = user != null && !user.isPrimeraCompraRealizada();
         return productRepository.findAvailableProducts(date)
                 .stream()
                 .map(p -> toResponse(p, descuento))
@@ -71,8 +82,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     public List<ProductResponse> getActiveProducts() {
-        User user = authenticationService.getCurrentUser();
-        boolean descuento = !user.isPrimeraCompraRealizada();
+        User user = authenticationService.getCurrentUserOrNull();
+        boolean descuento = user != null && !user.isPrimeraCompraRealizada();
         return productRepository.findByActiveTrue()
                 .stream()
                 .map(p -> toResponse(p, descuento))
@@ -80,8 +91,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     public ProductResponse getProductById(Long id) {
-        User user = authenticationService.getCurrentUser();
-        boolean descuento = !user.isPrimeraCompraRealizada();
+        User user = authenticationService.getCurrentUserOrNull();
+        boolean descuento = user != null && !user.isPrimeraCompraRealizada();
         return toResponse(
                 productRepository.findById(id).orElseThrow(ProductNotFoundException::new),
                 descuento
@@ -89,8 +100,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     public List<ProductResponse> getProductsBySellerId(Long sellerId) {
-        User user = authenticationService.getCurrentUser();
-        boolean descuento = !user.isPrimeraCompraRealizada();
+        User user = authenticationService.getCurrentUserOrNull();
+        boolean descuento = user != null && !user.isPrimeraCompraRealizada();
         return productRepository.findBySellerId(sellerId)
                 .stream()
                 .map(p -> toResponse(p, descuento))
@@ -98,8 +109,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     public List<ProductResponse> getProductsByVehicleType(VehicleType vehicleType) {
-        User user = authenticationService.getCurrentUser();
-        boolean descuento = !user.isPrimeraCompraRealizada();
+        User user = authenticationService.getCurrentUserOrNull();
+        boolean descuento = user != null && !user.isPrimeraCompraRealizada();
         return productRepository.findByVehicleType(vehicleType)
                 .stream()
                 .map(p -> toResponse(p, descuento))
@@ -107,8 +118,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     public List<ProductResponse> getProductsByPriceRange(Double minPrice, Double maxPrice) {
-        User user = authenticationService.getCurrentUser();
-        boolean descuento = !user.isPrimeraCompraRealizada();
+        User user = authenticationService.getCurrentUserOrNull();
+        boolean descuento = user != null && !user.isPrimeraCompraRealizada();
         return productRepository.findByPriceBetween(minPrice, maxPrice)
                 .stream()
                 .map(p -> toResponse(p, descuento))
@@ -128,6 +139,7 @@ public class ProductServiceImpl implements ProductService {
                 .description(request.getDescription())
                 .price(request.getPrice())
                 .address(request.getAddress())
+                .zone(request.getZone())
                 .active(request.getActive())
                 .vehicleType(VehicleType.valueOf(request.getVehicleType().toUpperCase()))
                 .seller(seller)
@@ -147,8 +159,16 @@ public class ProductServiceImpl implements ProductService {
         if (request.getDescription() != null) product.setDescription(request.getDescription());
         if (request.getPrice() != null) product.setPrice(request.getPrice());
         if (request.getAddress() != null) product.setAddress(request.getAddress());
+        if (request.getZone() != null) product.setZone(request.getZone());
         if (request.getVehicleType() != null) product.setVehicleType(VehicleType.valueOf(request.getVehicleType().toUpperCase()));
-
+        if (request.getAddress() != null || request.getZone() != null) {
+                double[] coordinates = locationService.getCoordinatesFromAddress(
+                        product.getAddress(),
+                        product.getZone()
+                );
+                product.setLatitude(coordinates[0]);
+                product.setLongitude(coordinates[1]);
+            }
         productRepository.save(product);
         return toResponse(product, false);
     }

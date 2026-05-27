@@ -55,13 +55,25 @@ public class Product {
     @JoinColumn(name = "seller_id", nullable = true)
     private User seller;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "product")
     private List<Image> images;
 
+    @JsonIgnore 
     @OneToMany(mappedBy = "product")
     private List<BlockedDate> blockedDates;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "product")
     private List<Reservation> reservations;
+
+    @Column(nullable = true)
+    private String zone;
+
+    @Column(nullable = true)
+    private Double latitude;
+
+    @Column(nullable = true)
+    private Double longitude;
 
 }
